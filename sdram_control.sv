@@ -12,6 +12,8 @@ module sdram_control
 	 input		 m_we	  , // 0 - read, 1 - write)
 	 input		 m_valid, //req
 	 
+	 input wire Serial_access,
+	 
 	 output      m_ready,
 	 output reg[15:0] out_data,  //Data read
 
@@ -44,12 +46,12 @@ assign sd_clk = clk_ref;
 					S_AUTO_REFRESH = 4'd3,
 					S_LOAD_MODE = 4'd4,
 					S_IDLE = 4'd5,
-					S_ACTIVATE_ROW = 4'd6,
-					S_WRITE = 4'd7,
-					S_PRECHARGE_AFTER_WRITE = 4'd8,
-					S_READ = 4'd9,
-					S_READING_DATA = 4'd10,
-					S_REFRESH_AFTER_READ = 4'd11;
+					S_NOT_PRECHARGE_IDLE = 4'd6,
+					S_ACTIVATE_ROW = 4'd7,
+					S_WRITE = 4'd8,
+					S_PRECHARGE_AFTER = 4'd9,
+					S_READ = 4'd10,
+					S_READING_DATA = 4'd11;
 
 					 
 always@(posedge clk_ref)
@@ -148,7 +150,7 @@ begin
 				begin
 					if(&cnt_refresh_sdram) 
 					begin
-						state_main <= S_PRECHARGE_AFTER_WRITE;
+						state_main <= S_PRECHARGE_AFTER;
 						cnt_refresh_sdram <= 0;
 					end 
 					else cnt_refresh_sdram <= cnt_refresh_sdram + 1'b1;
@@ -163,6 +165,29 @@ begin
 					
 				end 
 				
+			end
+			
+			S_NOT_PRECHARGE_IDLE:
+			begin
+				if (!Serial_access) state_main <= S_PRECHARGE_AFTER;
+				else
+				begin
+				
+					if (m_valid)
+					begin
+						if (m_addr_set[21:9] == m_addr[21:9])
+						begin
+							m_addr_set <= m_addr;
+							flg_first_cmd <= 1;
+							
+							if(m_we) state_main <= S_WRITE;
+							else state_main <= S_READ;
+						end
+						else  state_main <= S_PRECHARGE_AFTER;
+						
+					end
+				end
+			
 			end
 			
 			S_ACTIVATE_ROW:
@@ -196,24 +221,27 @@ begin
 					begin
 						m_ready<= 1'b0;
 						
-						state_main <= S_PRECHARGE_AFTER_WRITE;
+						if (Serial_access) state_main <= S_NOT_PRECHARGE_IDLE;
+						else  state_main <= S_PRECHARGE_AFTER;
 						
 					end
 					
 				end
 			end
-			
-			S_PRECHARGE_AFTER_WRITE:
+						
+			S_PRECHARGE_AFTER: 
 			
 			begin 
 				
+			begin
 				if(cnt_wait != 3) cnt_wait <= cnt_wait + 1'b1;
 				
 				else 
 				begin 
 					cnt_wait <= 0;
 					state_main <= S_IDLE;
-				end 
+				end
+			end
 				
 			end
 			
@@ -233,9 +261,10 @@ begin
 					
 						m_ready<= 1'b0;
 					
-						state_main <= S_REFRESH_AFTER_READ;
-						
 						cnt_wait <= 0;
+						
+						if (Serial_access) state_main <= S_NOT_PRECHARGE_IDLE;
+						else  state_main <= S_PRECHARGE_AFTER;
 						
 
 					end
@@ -246,18 +275,7 @@ begin
 				
 			end
 			
-			S_REFRESH_AFTER_READ: 
-			begin 
 			
-				if(cnt_wait != 3) cnt_wait <= cnt_wait + 1'b1;
-				
-				else
-				begin 
-					cnt_wait <= 0;
-					state_main <= S_IDLE;
-				end 
-				 			
-			end
 		endcase
 	end
 end
@@ -281,7 +299,7 @@ begin
 	case(state_main)
 
 		
-		S_PRECHARGE_ALL, S_REFRESH_AFTER_READ, S_PRECHARGE_AFTER_WRITE:  //precharge then NOP
+		S_PRECHARGE_ALL, S_PRECHARGE_AFTER:  //precharge then NOP
 		begin
 			sd_cas_n <=	1;
 			sd_ras_n <= (cnt_wait==0) ? 0:1;

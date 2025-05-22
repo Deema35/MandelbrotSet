@@ -122,7 +122,8 @@ module String_Buffer
 	
 	output wire [15:0]  Pix_color,
 	output wire [23:0]   DATA_addr,
-	output wire	DATA_in_ready
+	output wire	DATA_in_ready,
+	output wire	Serial_access = 'b0
 
 	
 	
@@ -165,7 +166,8 @@ begin
 			S_READBEGIN:
 			begin
 				BufferState <= S_READSTRING;
-				DATA_Counter <= 0;
+				DATA_Counter <= 'd0;
+				Serial_access <= 'b1;
 			end
 			
 			S_READSTRING:
@@ -176,19 +178,22 @@ begin
 					string_buf[DATA_Counter] <= DATA;
 					DATA_Counter <= DATA_Counter + 1;
 					DATA_in_ready <= 1'b0;
+					
 				end
 				else DATA_in_ready <= 1'b1;
 				
-			if (DATA_Counter == 800) BufferState <= S_READREADY;
+			if (DATA_Counter == 'd800) BufferState <= S_READREADY;
 					
 			end
 			
 			S_READREADY:
 			begin
-			
+				Serial_access <= 'b0;
 				if (Hblank)
 				begin
-					if (V_count < 599)
+					
+					
+					if (V_count < 'd599)
 					begin 
 						DATA_String_Counter <= V_count + 1'b1;
 						BufferState <= S_READBEGIN;

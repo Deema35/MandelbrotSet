@@ -78,6 +78,14 @@ Video
 	
 );
 
+//SDRAM
+wire m_we;
+wire m_valid;
+wire m_ready;
+wire[15:0] out_data;
+wire [23:0] m_addr;
+wire Serial_access;
+
 String_Buffer
 #(
 	.ENDFRAME(ENDFRAME)
@@ -94,16 +102,10 @@ Video_Buffer
 	.Write_Flag(write_flag),
 	.Pix_color(Pix_color),
 	.DATA_addr(m_addr_read),
-	.DATA_in_ready(m_valid_read)
+	.DATA_in_ready(m_valid_read),
+	.Serial_access(Serial_access)
 
 );
-
-//SDRAM
-wire m_we;
-wire m_valid;
-wire m_ready;
-wire[15:0] out_data;
-wire [23:0] m_addr;
 
 sdram_control   
 SDRAM_Controller
@@ -114,6 +116,7 @@ SDRAM_Controller
 	.m_addr(m_addr),
 	.m_we(m_we),
 	.m_valid(m_valid),
+	.Serial_access(Serial_access),
 	
 	.m_ready(m_ready),
 	.out_data(out_data),
@@ -140,6 +143,7 @@ wire [23:0] m_addr_write;
 wire [23:0] m_addr_read;
 reg copy_flag;
 
+
 assign m_valid = copy_flag ? m_valid_write : m_valid_read;
 assign m_addr = copy_flag ? m_addr_write : m_addr_read;
 
@@ -155,7 +159,7 @@ MONDELBROTE Mondelbrote
 	.m_addr(m_addr_write),
 	.m_valid(m_valid_write),
 	.o_data(Pic_data)
-
+	
 );
 
 
