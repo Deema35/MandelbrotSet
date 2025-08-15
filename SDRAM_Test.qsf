@@ -174,4 +174,5 @@ set_global_assignment -name QIP_FILE FP_I_To_F.qip
 set_global_assignment -name QIP_FILE FP_COMP.qip
 set_global_assignment -name QIP_FILE FP_DIV.qip
 set_global_assignment -name QIP_FILE FP_MUL.qip
+set_global_assignment -name SYSTEMVERILOG_FILE String_Buffer.sv
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
