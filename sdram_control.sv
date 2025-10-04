@@ -1,4 +1,4 @@
-module sdram_control
+module M_sdram_control
 #(
 	parameter CL = 3,
 	parameter	INIT_PER	=	12000
@@ -40,7 +40,7 @@ reg [10:0] cnt_refresh_sdram = 'd0;
 
 assign sd_clk = clk_ref;
 
-    parameter  S_WAIT = 4'd0,    
+localparam     S_WAIT = 4'd0,    
 					S_NOP = 4'd1,    
 					S_PRECHARGE_ALL = 4'd2,   
 					S_AUTO_REFRESH = 4'd3,
@@ -290,9 +290,9 @@ begin
 
 	out_data <= sd_data;
 
-	sd_cke <= (state_main == S_WAIT) ?  0:1;
+	sd_cke <= (state_main == S_WAIT) ?  1'b0: 1'b1;
 
-	sd_cs_n <= (rst == 1) ? 1:0;
+	sd_cs_n <= rst;
 
 	sd_addr[14:13] <= m_addr_set[23:22]; //Set bunk number
 	
@@ -302,51 +302,51 @@ begin
 		S_PRECHARGE_ALL, S_PRECHARGE_AFTER:  //precharge then NOP
 		begin
 			sd_cas_n <=	1;
-			sd_ras_n <= (cnt_wait==0) ? 0:1;
-			sd_we_n <= (cnt_wait==0) ? 0:1;
-			sd_addr[12:0] <= (cnt_wait==0) ? {4'b0,1'b1,10'b0} : 0;
+			sd_ras_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
+			sd_we_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
+			sd_addr[12:0] <= (cnt_wait == 0) ? {2'b0, 1'b1, 10'b0} : 13'd0;
 			
 		end
 		
 		S_AUTO_REFRESH: //autorefresh  then NOP
 		begin
-			sd_cas_n <= (cnt_wait[14:0]==0) ? 0:1;
-			sd_ras_n <= (cnt_wait[14:0]==0) ? 0:1;
-			sd_we_n	<= 1;
+			sd_cas_n <= (cnt_wait[14:0]==0) ? 1'b0 : 1'b1;
+			sd_ras_n <= (cnt_wait[14:0]==0) ? 1'b0 : 1'b1;
+			sd_we_n	<= 1'b1;
 			sd_addr[12:0] <= 0;
 		end
 		
 		S_LOAD_MODE: //load mode then NOP
 		begin
-			sd_cas_n <= (cnt_wait==0) ? 0:1;
-			sd_ras_n <= (cnt_wait==0) ? 0:1;
-			sd_we_n <= (cnt_wait==0) ? 0:1;
-			sd_addr[12:0] <= (cnt_wait==0)  ? {2'b00,3'b000,1'b1,2'b00,CL[2:0],1'b0,3'b000} : 0; 
+			sd_cas_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
+			sd_ras_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
+			sd_we_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
+			sd_addr[12:0] <= (cnt_wait == 0)  ? {3'b000,1'b1,2'b00,CL[2:0],1'b0,3'b000} : 13'd0; 
 			//BA[1:0]==0,A[12:10]==0,WRITE_BURST_MODE = 0,OP_MODE = 'd0, CL = 2, TYPE_BURST = 0, BURST_LENGTH = 1
 		end
 		
 		S_ACTIVATE_ROW: //activate then NOP
 		begin
 			sd_cas_n <= 1;
-			sd_ras_n <= (cnt_wait==0) ? 0:1;
+			sd_ras_n <= (cnt_wait==0) ? 1'b0 : 1'b1;
 			sd_we_n <= 1;
-			sd_addr[12:0] <= (cnt_wait==0)  ? m_addr_set[21:9] : 0;
+			sd_addr[12:0] <= (cnt_wait==0)  ? m_addr_set[21:9] : 13'd0;
 		end
 		
 		S_WRITE: //WRITE or NOP
 		begin
-			sd_cas_n <= (m_valid == 1 && m_ready == 1) ? 0:1;
+			sd_cas_n <= (m_valid == 1 && m_ready == 1) ? 1'b0 : 1'b1;
 			sd_ras_n <= 1;
-			sd_we_n <= (m_valid == 1 && m_ready == 1) ? 0:1;
-			sd_addr[12:0] <= {7'd0,m_addr_set[8:0]};
+			sd_we_n <= (m_valid == 1 && m_ready == 1) ? 1'b0 : 1'b1;
+			sd_addr[12:0] <= {4'd0, m_addr_set[8:0]};
 		end
 		
 		S_READ: //Read then NOP
 		begin
-			sd_cas_n <= (cnt_wait==0) ? 0:1;
+			sd_cas_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
 			sd_ras_n <=  1;
 			sd_we_n <=  1;
-			sd_addr[12:0] <= {7'd0,m_addr_set[8:0]};
+			sd_addr[12:0] <= {4'd0,m_addr_set[8:0]};
 		end
 		
 		

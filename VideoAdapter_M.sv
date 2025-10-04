@@ -1,4 +1,4 @@
-module VideoAdapter_M
+module M_VideoAdapter
 #(
 	parameter ENDSTRING = 11'd1055,
 	parameter ENDFRAME = 11'd627
@@ -61,7 +61,7 @@ VerticalCounter
 	.clk(clk),
 	.rst(rst),
 	.Hor_count(H_count),
-	.DATA(V_count),
+	.DATA(V_count)
 );
 
 always @(posedge clk ) 

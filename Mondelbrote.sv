@@ -12,10 +12,8 @@ module MONDELBROTE
 	output reg copy_flag,
 	output reg [23:0] m_addr,
 	output reg m_valid,
-	output wire [15:0]o_data,
-	output reg flag
+	output wire [15:0]o_data
 	
-
 );
  
 reg [10:0] H_count = 0;
@@ -25,13 +23,14 @@ reg Calk;
 
  
 assign m_addr[10:0] = H_count;
-assign m_addr[20:11] = V_count;
-assign m_addr[23:21] = 0;
+assign m_addr[21:11] = V_count;
+assign m_addr[23:22] = 0;
 
 MONDELBROTE_BUILDER
 #(
 	.MONDELBROTE_DEPTH(MONDELBROTE_DEPTH)
 )
+	BUILDER
 (
 	.clk(clk), 
 	.rst(rst),
@@ -46,7 +45,7 @@ reg [4:0] WriteState;
 
 
 
-parameter   S_DATA_CALCULATE = 4'd0,
+localparam  S_DATA_CALCULATE = 4'd0,
 				S_WRITE_READY = 4'd1,
 				S_WRITE = 4'd2,
 				S_WRITE_POST = 4'd3,
@@ -108,11 +107,11 @@ begin
 			
 			if (V_count != 600)
 			begin 
-				if (H_count != 800) H_count <= H_count + 1;
+				if (H_count != 800) H_count <= H_count + 1'b1;
 				else 
 				begin
 					H_count <= 0;
-					V_count <= V_count + 1;
+					V_count <= V_count + 1'b1;
 				end
 				WriteState <= S_DATA_CALCULATE;
 			end
@@ -173,16 +172,16 @@ wire [31:0] zizrpruduct;
 wire [31:0] twozizrpruduct;
 wire [31:0] cmp;
 reg [31:0] k;
-reg [6:0] m;
+reg [31:0] m;
 
 
 
 wire Lim_over;
 
-parameter TWO = 32'b01000000000000000000000000000000; //2
-parameter THREE = 32'b01000011100101100000000000000000; //0.5 * 600 =300
-parameter X_OFF_ON_WEIGHT = 32'b01000100000111000000000000000000; //0.78 * 800 = 624
-parameter MAX_LIMIT = 32'b01000111110000110101000000000000;// 100000
+localparam TWO = 32'b01000000000000000000000000000000; //2
+localparam THREE = 32'b01000011100101100000000000000000; //0.5 * 600 =300
+localparam X_OFF_ON_WEIGHT = 32'b01000100000111000000000000000000; //0.78 * 800 = 624
+localparam MAX_LIMIT = 32'b01000111110000110101000000000000;// 100000
 
 reg [11:0]   ColorPallet [45:0];
 initial begin
@@ -243,7 +242,7 @@ reg [3:0] WriteState = 0;
 
 
 
-parameter   S_WAIT = 4'd0,
+localparam   S_WAIT = 4'd0,
 				S_INT_CONVERT = 4'd1,
 				S_CI_AND_CR_CALK = 4'd2,
 				S_CI_AND_CR_CALK_2 = 4'd3,

@@ -57,7 +57,7 @@ PLL PLL_Loop
 
 
 
-VideoAdapter_M 
+M_VideoAdapter
 #(
 	.ENDSTRING(ENDSTRING),
 	.ENDFRAME(ENDFRAME)
@@ -86,7 +86,7 @@ wire[15:0] out_data;
 wire [23:0] m_addr;
 wire Serial_access;
 
-String_Buffer
+M_String_Buffer
 #(
 	.ENDFRAME(ENDFRAME)
 )
@@ -99,7 +99,6 @@ Video_Buffer
 	.H_count(H_count),
 	.V_count(V_count),
 	.Hblank(Hblank),
-	.Write_Flag(write_flag),
 	.Pix_color(Pix_color),
 	.DATA_addr(m_addr_read),
 	.DATA_in_ready(m_valid_read),
@@ -107,8 +106,7 @@ Video_Buffer
 
 );
 
-sdram_control   
-SDRAM_Controller
+M_sdram_control SDRAM_Controller
 (
 	.clk_ref(clk_120),
 	.rst(!RESET_N),

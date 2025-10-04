@@ -1,4 +1,4 @@
-module String_Buffer
+module M_String_Buffer
 #(
 	parameter ENDFRAME = 11'd1055
 )
@@ -10,7 +10,6 @@ module String_Buffer
 	input wire [10:0] V_count,
 	input wire [10:0] H_count,
 	input wire Hblank,
-	input wire Write_Flag,
 	
 	output wire [15:0]  Pix_color,
 	output wire [23:0]   DATA_addr,
@@ -35,7 +34,7 @@ assign DATA_addr[23:22] = 0;
 
 reg [3:0]BufferState;
 
-parameter   S_READBEGIN = 4'd0,
+localparam   S_READBEGIN = 4'd0,
 				S_READSTRING = 4'd1,
 				S_READREADY = 4'd2;
 
@@ -68,7 +67,7 @@ begin
 				if (DATA_valid)
 				begin
 					string_buf[DATA_Counter] <= DATA;
-					DATA_Counter <= DATA_Counter + 1;
+					DATA_Counter <= DATA_Counter + 11'd1;
 					DATA_in_ready <= 1'b0;
 					
 				end
