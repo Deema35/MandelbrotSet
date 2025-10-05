@@ -8,11 +8,11 @@ module MONDELBROTE
 	input wire rst,
 	input wire m_ready,
 	
-	output reg m_we,
-	output reg copy_flag,
-	output reg [23:0] m_addr,
-	output reg m_valid,
-	output wire [15:0]o_data
+	output reg m_we = 1'b0,
+	output wire [23:0] m_addr,
+	output reg m_valid = 1'b0,
+	output wire [15:0]o_data,
+	output reg	Serial_access = 1'b0
 	
 );
  
@@ -47,7 +47,6 @@ reg [4:0] WriteState;
 
 localparam  S_DATA_CALCULATE = 4'd0,
 				S_WRITE_READY = 4'd1,
-				S_WRITE = 4'd2,
 				S_WRITE_POST = 4'd3,
 				S_WRITE_END = 4'd4; 
 		
@@ -72,10 +71,13 @@ begin
 		
 		S_DATA_CALCULATE:
 		begin
+			
 			if (!INICIALIZATION_EN) WriteState <= S_WRITE_END;
 			else
 			begin
 				Calk <= 1'b1;
+				m_we <= 1'b1;
+				Serial_access <= 1'b1;
 				
 				if (PixReady)
 				begin
@@ -86,20 +88,13 @@ begin
 		end
 		S_WRITE_READY:
 		begin 
+			if (m_ready)
+			begin
+				m_valid <= 1'b0;
 			
-			m_we <= 1'b1;
-			m_valid <= 1'b1;
-			copy_flag = 1;
-			
-			if (m_ready) WriteState <= S_WRITE;
-		end
-		
-		S_WRITE:
-		begin
-			m_we <= 1'b0;
-			m_valid <= 1'b0;
-			
-			WriteState <= S_WRITE_POST;
+				WriteState <= S_WRITE_POST;
+			end
+			else m_valid <= 1'b1;
 		end
 		
 		S_WRITE_POST:
@@ -121,7 +116,8 @@ begin
 		
 		S_WRITE_END: 
 		begin
-			copy_flag <= 1'b0;
+			m_we <= 1'b0;
+			Serial_access <= 1'b0;
 		end
 	endcase
 		

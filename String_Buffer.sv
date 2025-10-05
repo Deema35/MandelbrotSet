@@ -13,8 +13,8 @@ module M_String_Buffer
 	
 	output wire [15:0]  Pix_color,
 	output wire [23:0]   DATA_addr,
-	output wire	DATA_in_ready,
-	output wire	Serial_access = 'b0
+	output reg	DATA_in_ready = 1'b0,
+	output reg	Serial_access = 1'b0
 
 	
 	

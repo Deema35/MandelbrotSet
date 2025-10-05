@@ -4,32 +4,39 @@ module M_sdram_control
 	parameter	INIT_PER	=	12000
 )
 (
-    input clk_ref,
-	 input rst,
-	 //user interface)
-	 input [15:0] in_data, // valid if m_we==1 Data write
-	 input [23:0] m_addr, //2bit BANK, 13bit ROW, 9bit COLUMM
-	 input		 m_we	  , // 0 - read, 1 - write)
-	 input		 m_valid, //req
+   input wire clk_ref,
+	input wire rst,
+	input wire [15:0] in_data, // valid if m_we==1 Data write
+	input wire [23:0] m_addr_write, //2bit BANK, 13bit ROW, 9bit COLUMM
+	input wire [23:0] m_addr_read,
+	
+	input	wire m_we	  , // 0 - read, 1 - write)
+	
+	input wire m_valid_write,
+	input wire m_valid_read, 
 	 
-	 input wire Serial_access,
+	input wire Serial_access_write,
+	input wire Serial_access_read,
 	 
-	 output      m_ready,
-	 output reg[15:0] out_data,  //Data read
+	output reg m_ready = 1'b0,
+	output reg[15:0] out_data,  //Data read
 
 	 	 
 	 //SDRAM interface
-	 output reg sd_cke,
-	 output sd_clk,
-	 output sd_dqml,
-	 output sd_dqmh,
-	 output reg  sd_cas_n,
-	 output reg sd_ras_n,
-	 output reg sd_we_n,
-	 output reg sd_cs_n,
-	 output reg [14:0] sd_addr,
-	 inout  tri [15:0] sd_data
+	output reg sd_cke,
+	output sd_clk,
+	output sd_dqml,
+	output sd_dqmh,
+	output reg  sd_cas_n,
+	output reg sd_ras_n,
+	output reg sd_we_n,
+	output reg sd_cs_n,
+	output reg [14:0] sd_addr,
+	inout  tri [15:0] sd_data
 );
+
+wire m_valid;
+assign m_valid = (m_we) ? m_valid_write : m_valid_read;
 
 
 reg [3:0] state_main = S_WAIT;
@@ -47,11 +54,12 @@ localparam     S_WAIT = 4'd0,
 					S_LOAD_MODE = 4'd4,
 					S_IDLE = 4'd5,
 					S_NOT_PRECHARGE_IDLE = 4'd6,
-					S_ACTIVATE_ROW = 4'd7,
-					S_WRITE = 4'd8,
-					S_PRECHARGE_AFTER = 4'd9,
-					S_READ = 4'd10,
-					S_READING_DATA = 4'd11;
+					S_ACTIVATE_ROW_READ = 4'd7,
+					S_ACTIVATE_ROW_WRITE = 4'd8,
+					S_WRITE = 4'd9,
+					S_PRECHARGE_AFTER = 4'd10,
+					S_READ = 4'd11,
+					S_READING_DATA = 4'd12;
 
 					 
 always@(posedge clk_ref)
@@ -144,7 +152,6 @@ begin
 			end
 			
 			S_IDLE:  
-			
 			begin 
 				if(!m_valid) 
 				begin
@@ -160,38 +167,49 @@ begin
 				
 				begin
 					cnt_refresh_sdram <= 0;
-					m_addr_set <= m_addr;
-					state_main <= S_ACTIVATE_ROW;
 					
+					if(m_we)
+					begin
+						state_main <= S_ACTIVATE_ROW_WRITE;
+						m_addr_set <= m_addr_write;
+					end
+					else
+					begin
+						state_main <= S_ACTIVATE_ROW_READ;
+						m_addr_set <= m_addr_read;
+					end
 				end 
 				
 			end
 			
 			S_NOT_PRECHARGE_IDLE:
 			begin
-				if (!Serial_access) state_main <= S_PRECHARGE_AFTER;
-				else
+				if (m_valid)
 				begin
-				
-					if (m_valid)
+					if(m_we)
 					begin
-						if (m_addr_set[21:9] == m_addr[21:9])
+						if (m_addr_set[21:9] == m_addr_write[21:9] & Serial_access_write )
 						begin
-							m_addr_set <= m_addr;
 							flg_first_cmd <= 1;
-							
-							if(m_we) state_main <= S_WRITE;
-							else state_main <= S_READ;
+							m_addr_set <= m_addr_write;
+							state_main <= S_WRITE;
 						end
 						else  state_main <= S_PRECHARGE_AFTER;
-						
+					end
+					else
+					begin
+						if (m_addr_set[21:9] == m_addr_read[21:9] & Serial_access_read)
+						begin
+							flg_first_cmd <= 1;
+							m_addr_set <= m_addr_read;
+							state_main <= S_READ;
+						end
+						else  state_main <= S_PRECHARGE_AFTER;
 					end
 				end
-			
 			end
 			
-			S_ACTIVATE_ROW:
-			
+			S_ACTIVATE_ROW_READ:
 			begin 
 				if(cnt_wait != CL) cnt_wait <= cnt_wait + 1'b1;
 				
@@ -199,32 +217,47 @@ begin
 				
 				begin 
 					cnt_wait <= 0;
-					
-					if(m_we) state_main <= S_WRITE;
-					else state_main <= S_READ;
-					
 					flg_first_cmd <= 1;
+					
+					state_main <= S_READ;
 				end 
 			end
+			
+			S_ACTIVATE_ROW_WRITE:
+			begin 
+				if(cnt_wait != CL) cnt_wait <= cnt_wait + 1'b1;
+				
+				else
+				
+				begin 
+					cnt_wait <= 0;
+					flg_first_cmd <= 1;
+					
+					state_main <= S_WRITE;
+					
+				end 
+			end
+			
 			S_WRITE: 
 			
 			begin
 			
-				m_ready<= 1'b1;
+				
 				
 				if(flg_first_cmd) flg_first_cmd <= 0;
 				
 				else 
 				begin 
 				
-					if(m_valid == 0) 
+					if(!m_valid_write) 
 					begin
 						m_ready<= 1'b0;
 						
-						if (Serial_access) state_main <= S_NOT_PRECHARGE_IDLE;
+						if (Serial_access_write) state_main <= S_NOT_PRECHARGE_IDLE;
 						else  state_main <= S_PRECHARGE_AFTER;
 						
 					end
+					else m_ready<= 1'b1;
 					
 				end
 			end
@@ -253,23 +286,25 @@ begin
 				
 				else 
 				begin
-					if (cnt_wait > CL) m_ready<= 1'b1;
 					
-					
-					if(m_valid == 1'b0) 
+					if(!m_valid_read) 
 					begin
 					
 						m_ready<= 1'b0;
 					
 						cnt_wait <= 0;
 						
-						if (Serial_access) state_main <= S_NOT_PRECHARGE_IDLE;
+						if (Serial_access_read) state_main <= S_NOT_PRECHARGE_IDLE;
 						else  state_main <= S_PRECHARGE_AFTER;
 						
 
 					end
 					
-					else cnt_wait <= cnt_wait + 1'b1;
+					else
+					begin
+						if (cnt_wait > CL) m_ready<= 1'b1;
+						else cnt_wait <= cnt_wait + 1'b1;
+					end
 				end
 				
 				
@@ -301,7 +336,7 @@ begin
 		
 		S_PRECHARGE_ALL, S_PRECHARGE_AFTER:  //precharge then NOP
 		begin
-			sd_cas_n <=	1;
+			sd_cas_n <=	1'b1;
 			sd_ras_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
 			sd_we_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
 			sd_addr[12:0] <= (cnt_wait == 0) ? {2'b0, 1'b1, 10'b0} : 13'd0;
@@ -310,10 +345,10 @@ begin
 		
 		S_AUTO_REFRESH: //autorefresh  then NOP
 		begin
-			sd_cas_n <= (cnt_wait[14:0]==0) ? 1'b0 : 1'b1;
-			sd_ras_n <= (cnt_wait[14:0]==0) ? 1'b0 : 1'b1;
+			sd_cas_n <= (cnt_wait[14:0] == 0) ? 1'b0 : 1'b1;
+			sd_ras_n <= (cnt_wait[14:0] == 0) ? 1'b0 : 1'b1;
 			sd_we_n	<= 1'b1;
-			sd_addr[12:0] <= 0;
+			sd_addr[12:0] <= 'd0;
 		end
 		
 		S_LOAD_MODE: //load mode then NOP
@@ -325,7 +360,8 @@ begin
 			//BA[1:0]==0,A[12:10]==0,WRITE_BURST_MODE = 0,OP_MODE = 'd0, CL = 2, TYPE_BURST = 0, BURST_LENGTH = 1
 		end
 		
-		S_ACTIVATE_ROW: //activate then NOP
+		S_ACTIVATE_ROW_WRITE,
+		S_ACTIVATE_ROW_READ: //activate then NOP
 		begin
 			sd_cas_n <= 1;
 			sd_ras_n <= (cnt_wait==0) ? 1'b0 : 1'b1;
