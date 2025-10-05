@@ -38,6 +38,9 @@ module M_sdram_control
 wire m_valid;
 assign m_valid = (m_we) ? m_valid_write : m_valid_read;
 
+wire Serial_access;
+assign Serial_access = (m_we) ? Serial_access_write : Serial_access_read;
+
 
 reg [3:0] state_main = S_WAIT;
 reg [23:0] m_addr_set;
@@ -166,15 +169,17 @@ begin
 				else
 				
 				begin
-					cnt_refresh_sdram <= 0;
+					
 					
 					if(m_we)
 					begin
+						cnt_refresh_sdram <= 0;
 						state_main <= S_ACTIVATE_ROW_WRITE;
 						m_addr_set <= m_addr_write;
 					end
 					else
 					begin
+						cnt_refresh_sdram <= 0;
 						state_main <= S_ACTIVATE_ROW_READ;
 						m_addr_set <= m_addr_read;
 					end
@@ -184,27 +189,31 @@ begin
 			
 			S_NOT_PRECHARGE_IDLE:
 			begin
-				if (m_valid)
+				if (!Serial_access) state_main <= S_PRECHARGE_AFTER;
+				else
 				begin
-					if(m_we)
+					if (m_valid)
 					begin
-						if (m_addr_set[21:9] == m_addr_write[21:9] & Serial_access_write )
+						if(m_we)
 						begin
-							flg_first_cmd <= 1;
-							m_addr_set <= m_addr_write;
-							state_main <= S_WRITE;
+							if (m_addr_set[21:9] == m_addr_write[21:9])
+							begin
+								flg_first_cmd <= 1;
+								m_addr_set <= m_addr_write;
+								state_main <= S_WRITE;
+							end
+							else  state_main <= S_PRECHARGE_AFTER;
 						end
-						else  state_main <= S_PRECHARGE_AFTER;
-					end
-					else
-					begin
-						if (m_addr_set[21:9] == m_addr_read[21:9] & Serial_access_read)
+						else
 						begin
-							flg_first_cmd <= 1;
-							m_addr_set <= m_addr_read;
-							state_main <= S_READ;
+							if (m_addr_set[21:9] == m_addr_read[21:9])
+							begin
+								flg_first_cmd <= 1;
+								m_addr_set <= m_addr_read;
+								state_main <= S_READ;
+							end
+							else  state_main <= S_PRECHARGE_AFTER;
 						end
-						else  state_main <= S_PRECHARGE_AFTER;
 					end
 				end
 			end
@@ -241,9 +250,6 @@ begin
 			S_WRITE: 
 			
 			begin
-			
-				
-				
 				if(flg_first_cmd) flg_first_cmd <= 0;
 				
 				else 
@@ -302,7 +308,11 @@ begin
 					
 					else
 					begin
-						if (cnt_wait > CL) m_ready<= 1'b1;
+						if (cnt_wait > CL) 
+						begin
+							m_ready<= 1'b1;
+							out_data <= sd_data;
+						end
 						else cnt_wait <= cnt_wait + 1'b1;
 					end
 				end
@@ -323,7 +333,7 @@ assign sd_dqmh	= 0;
 always@(posedge clk_ref)
 begin
 
-	out_data <= sd_data;
+	
 
 	sd_cke <= (state_main == S_WAIT) ?  1'b0: 1'b1;
 
@@ -357,7 +367,7 @@ begin
 			sd_ras_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
 			sd_we_n <= (cnt_wait == 0) ? 1'b0 : 1'b1;
 			sd_addr[12:0] <= (cnt_wait == 0)  ? {3'b000,1'b1,2'b00,CL[2:0],1'b0,3'b000} : 13'd0; 
-			//BA[1:0]==0,A[12:10]==0,WRITE_BURST_MODE = 0,OP_MODE = 'd0, CL = 2, TYPE_BURST = 0, BURST_LENGTH = 1
+			//BA[1:0]==0,A[12:10]==0,WRITE_BURST_MODE = 0,OP_MODE = 'd0, CL = 3, TYPE_BURST = 0, BURST_LENGTH = 1
 		end
 		
 		S_ACTIVATE_ROW_WRITE,

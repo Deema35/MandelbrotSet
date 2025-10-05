@@ -1,6 +1,7 @@
 module M_String_Buffer
 #(
-	parameter ENDFRAME = 11'd1055
+	parameter ENDFRAME = 11'd1055,
+	parameter SDRAM_BANK = 2'd0
 )
 (
 	input wire clk,
@@ -30,7 +31,7 @@ reg [10:0]DATA_String_Counter = 0;
 
 assign DATA_addr[10:0] = DATA_Counter[10:0];
 assign DATA_addr[21:11] = DATA_String_Counter[10:0];
-assign DATA_addr[23:22] = 0;
+assign DATA_addr[23:22] = SDRAM_BANK;
 
 reg [3:0]BufferState;
 
