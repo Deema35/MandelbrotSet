@@ -79,13 +79,18 @@ Video
 );
 
 //SDRAM
-wire m_we;
-wire m_valid;
-wire m_ready;
+wire m_valid_read;
+wire m_valid_write;
+wire m_ready_read;
+wire m_ready_write;
 wire[15:0] out_data;
 wire [23:0] m_addr;
 wire Serial_access_read;
 wire Serial_access_write;
+
+reg[15:0] Pic_data;
+wire [23:0] m_addr_write;
+wire [23:0] m_addr_read;
 
 M_String_Buffer
 #(
@@ -96,7 +101,7 @@ Video_Buffer
 	.clk(clk_120),
 	.rst(!RESET_N),
 	.DATA(out_data),
-	.DATA_valid(m_ready),
+	.DATA_valid(m_ready_read),
 	.H_count(H_count),
 	.V_count(V_count),
 	.Hblank(Hblank),
@@ -114,13 +119,14 @@ M_sdram_control SDRAM_Controller
 	.in_data(Pic_data),
 	.m_addr_read(m_addr_read),
 	.m_addr_write(m_addr_write),
-	.m_we(m_we),
 	.m_valid_read(m_valid_read),
 	.m_valid_write(m_valid_write),
 	.Serial_access_write(Serial_access_write),
 	.Serial_access_read(Serial_access_read),
 	
-	.m_ready(m_ready),
+	.m_ready_write(m_ready_write),
+	.m_ready_read(m_ready_read),
+	
 	.out_data(out_data),
 	
 	.sd_cke(DRAM_CKE),
@@ -136,22 +142,12 @@ M_sdram_control SDRAM_Controller
 	
 );
 
-//Mem copy
-
-reg[15:0] Pic_data;
-wire m_valid_write;
-wire m_valid_read; 
-wire [23:0] m_addr_write;
-wire [23:0] m_addr_read;
-
 
 MONDELBROTE Mondelbrote
 (
 	.clk(clk_120),
 	.rst(!RESET_N),
-	.m_ready(m_ready),
-
-	.m_we(m_we),
+	.m_ready(m_ready_write),
 	.m_addr(m_addr_write),
 	.m_valid(m_valid_write),
 	.o_data(Pic_data),

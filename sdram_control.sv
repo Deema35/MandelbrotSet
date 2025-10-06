@@ -6,11 +6,9 @@ module M_sdram_control
 (
    input wire clk_ref,
 	input wire rst,
-	input wire [15:0] in_data, // valid if m_we==1 Data write
+	input wire [15:0] in_data, 
 	input wire [23:0] m_addr_write, //2bit BANK, 13bit ROW, 9bit COLUMM
 	input wire [23:0] m_addr_read,
-	
-	input	wire m_we	  , // 0 - read, 1 - write)
 	
 	input wire m_valid_write,
 	input wire m_valid_read, 
@@ -18,28 +16,29 @@ module M_sdram_control
 	input wire Serial_access_write,
 	input wire Serial_access_read,
 	 
-	output reg m_ready = 1'b0,
+	output reg m_ready_write = 1'b0,
+	output reg m_ready_read = 1'b0,
+	
 	output reg[15:0] out_data,  //Data read
 
 	 	 
 	 //SDRAM interface
 	output reg sd_cke,
-	output sd_clk,
-	output sd_dqml,
-	output sd_dqmh,
-	output reg  sd_cas_n,
-	output reg sd_ras_n,
-	output reg sd_we_n,
-	output reg sd_cs_n,
-	output reg [14:0] sd_addr,
+	output wire sd_clk,
+	output wire sd_dqml,
+	output wire sd_dqmh,
+	output reg  sd_cas_n = 1'b0,
+	output reg sd_ras_n = 1'b0,
+	output reg sd_we_n = 1'b0,
+	output reg sd_cs_n = 1'b0,
+	output reg [14:0] sd_addr = 'd0,
 	inout  tri [15:0] sd_data
 );
 
-wire m_valid;
-assign m_valid = (m_we) ? m_valid_write : m_valid_read;
+assign sd_dqml	= 1'b0;
+assign sd_dqmh	= 1'b0;
 
-wire Serial_access;
-assign Serial_access = (m_we) ? Serial_access_write : Serial_access_read;
+assign  sd_data = (state_main == S_WRITE) ? in_data : 16'hzzzz;
 
 
 reg [3:0] state_main = S_WAIT;
@@ -56,23 +55,26 @@ localparam     S_WAIT = 4'd0,
 					S_AUTO_REFRESH = 4'd3,
 					S_LOAD_MODE = 4'd4,
 					S_IDLE = 4'd5,
-					S_NOT_PRECHARGE_IDLE = 4'd6,
-					S_ACTIVATE_ROW_READ = 4'd7,
-					S_ACTIVATE_ROW_WRITE = 4'd8,
-					S_WRITE = 4'd9,
-					S_PRECHARGE_AFTER = 4'd10,
-					S_READ = 4'd11,
-					S_READING_DATA = 4'd12;
+					S_NOT_PRECHARGE_IDLE_READ = 4'd6,
+					S_NOT_PRECHARGE_IDLE_WRITE = 4'd7,
+					S_ACTIVATE_ROW_READ = 4'd8,
+					S_ACTIVATE_ROW_WRITE = 4'd9,
+					S_WRITE = 4'd10,
+					S_PRECHARGE_AFTER = 4'd11,
+					S_READ = 4'd12,
+					S_READING_DATA = 4'd13;
 
 					 
 always@(posedge clk_ref)
 begin
 	if(rst) begin
 		state_main <= S_WAIT;
-		
+		out_data <= 'd0;
+		cnt_refresh_sdram <= 'd0;
 		flg_first_cmd <= 1'b1;
 		cnt_wait <= 1'b0;
-		m_ready <= 1'b0;
+		m_ready_write <= 1'b0;
+		m_ready_read <= 1'b0;
 		
 	end
 	else
@@ -156,7 +158,19 @@ begin
 			
 			S_IDLE:  
 			begin 
-				if(!m_valid) 
+				if(m_valid_write)
+				begin
+					cnt_refresh_sdram <= 0;
+					state_main <= S_ACTIVATE_ROW_WRITE;
+					m_addr_set <= m_addr_write;
+				end
+				else if (m_valid_read)
+				begin
+					cnt_refresh_sdram <= 0;
+					state_main <= S_ACTIVATE_ROW_READ;
+					m_addr_set <= m_addr_read;
+				end
+				else
 				begin
 					if(&cnt_refresh_sdram) 
 					begin
@@ -165,55 +179,42 @@ begin
 					end 
 					else cnt_refresh_sdram <= cnt_refresh_sdram + 1'b1;
 				end
-				
-				else
-				
-				begin
-					
-					
-					if(m_we)
-					begin
-						cnt_refresh_sdram <= 0;
-						state_main <= S_ACTIVATE_ROW_WRITE;
-						m_addr_set <= m_addr_write;
-					end
-					else
-					begin
-						cnt_refresh_sdram <= 0;
-						state_main <= S_ACTIVATE_ROW_READ;
-						m_addr_set <= m_addr_read;
-					end
-				end 
-				
+			
 			end
 			
-			S_NOT_PRECHARGE_IDLE:
+			S_NOT_PRECHARGE_IDLE_READ:
 			begin
-				if (!Serial_access) state_main <= S_PRECHARGE_AFTER;
+				if (!Serial_access_read) state_main <= S_PRECHARGE_AFTER;
 				else
 				begin
-					if (m_valid)
+					if (m_valid_read)
 					begin
-						if(m_we)
+						if (m_addr_set[21:9] == m_addr_read[21:9])
 						begin
-							if (m_addr_set[21:9] == m_addr_write[21:9])
-							begin
-								flg_first_cmd <= 1;
-								m_addr_set <= m_addr_write;
-								state_main <= S_WRITE;
-							end
-							else  state_main <= S_PRECHARGE_AFTER;
+							flg_first_cmd <= 1;
+							m_addr_set <= m_addr_read;
+							state_main <= S_READ;
 						end
-						else
+						else  state_main <= S_PRECHARGE_AFTER;
+					end
+					
+				end
+			end
+			
+			S_NOT_PRECHARGE_IDLE_WRITE:
+			begin
+				if (!Serial_access_write) state_main <= S_PRECHARGE_AFTER;
+				else
+				begin
+					if (m_valid_write)
+					begin
+						if (m_addr_set[21:9] == m_addr_write[21:9])
 						begin
-							if (m_addr_set[21:9] == m_addr_read[21:9])
-							begin
-								flg_first_cmd <= 1;
-								m_addr_set <= m_addr_read;
-								state_main <= S_READ;
-							end
-							else  state_main <= S_PRECHARGE_AFTER;
+							flg_first_cmd <= 1;
+							m_addr_set <= m_addr_write;
+							state_main <= S_WRITE;
 						end
+						else  state_main <= S_PRECHARGE_AFTER;
 					end
 				end
 			end
@@ -257,13 +258,13 @@ begin
 				
 					if(!m_valid_write) 
 					begin
-						m_ready<= 1'b0;
+						m_ready_write<= 1'b0;
 						
-						if (Serial_access_write) state_main <= S_NOT_PRECHARGE_IDLE;
+						if (Serial_access_write) state_main <= S_NOT_PRECHARGE_IDLE_WRITE;
 						else  state_main <= S_PRECHARGE_AFTER;
 						
 					end
-					else m_ready<= 1'b1;
+					else m_ready_write<= 1'b1;
 					
 				end
 			end
@@ -296,11 +297,11 @@ begin
 					if(!m_valid_read) 
 					begin
 					
-						m_ready<= 1'b0;
+						m_ready_read<= 1'b0;
 					
 						cnt_wait <= 0;
 						
-						if (Serial_access_read) state_main <= S_NOT_PRECHARGE_IDLE;
+						if (Serial_access_read) state_main <= S_NOT_PRECHARGE_IDLE_READ;
 						else  state_main <= S_PRECHARGE_AFTER;
 						
 
@@ -310,7 +311,7 @@ begin
 					begin
 						if (cnt_wait > CL) 
 						begin
-							m_ready<= 1'b1;
+							m_ready_read<= 1'b1;
 							out_data <= sd_data;
 						end
 						else cnt_wait <= cnt_wait + 1'b1;
@@ -327,8 +328,7 @@ end
 
 
 					  
-assign sd_dqml	= 0;
-assign sd_dqmh	= 0;
+
 
 always@(posedge clk_ref)
 begin
@@ -381,9 +381,9 @@ begin
 		
 		S_WRITE: //WRITE or NOP
 		begin
-			sd_cas_n <= (m_valid == 1 && m_ready == 1) ? 1'b0 : 1'b1;
+			sd_cas_n <= (m_valid_write == 1 && m_ready_write == 1) ? 1'b0 : 1'b1;
 			sd_ras_n <= 1;
-			sd_we_n <= (m_valid == 1 && m_ready == 1) ? 1'b0 : 1'b1;
+			sd_we_n <= (m_valid_write == 1 && m_ready_write == 1) ? 1'b0 : 1'b1;
 			sd_addr[12:0] <= {4'd0, m_addr_set[8:0]};
 		end
 		
@@ -410,7 +410,7 @@ end
 
 
 
-assign  sd_data = (state_main == S_WRITE) ? in_data : 16'hzzzz;
+
 
 
 

@@ -8,7 +8,6 @@ module MONDELBROTE
 	input wire rst,
 	input wire m_ready,
 	
-	output reg m_we = 1'b0,
 	output wire [23:0] m_addr,
 	output reg m_valid = 1'b0,
 	output wire [15:0]o_data,
@@ -76,7 +75,6 @@ begin
 			else
 			begin
 				Calk <= 1'b1;
-				m_we <= 1'b1;
 				Serial_access <= 1'b1;
 				
 				if (PixReady)
@@ -116,7 +114,6 @@ begin
 		
 		S_WRITE_END: 
 		begin
-			m_we <= 1'b0;
 			Serial_access <= 1'b0;
 		end
 	endcase
