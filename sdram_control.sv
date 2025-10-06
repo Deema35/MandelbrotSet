@@ -1,7 +1,8 @@
 module M_sdram_control
 #(
 	parameter CL = 3,
-	parameter	INIT_PER	=	12000
+	parameter	INIT_PER	=	12000,
+	parameter NOP_WAITE = 2000
 )
 (
    input wire clk_ref,
@@ -19,7 +20,7 @@ module M_sdram_control
 	output reg m_ready_write = 1'b0,
 	output reg m_ready_read = 1'b0,
 	
-	output reg[15:0] out_data,  //Data read
+	output reg[15:0] out_data = 'd0,  //Data read
 
 	 	 
 	 //SDRAM interface
@@ -46,6 +47,7 @@ reg [23:0] m_addr_set;
 reg flg_first_cmd = 1'b1;
 reg [15:0] cnt_wait = 'd0;
 reg [10:0] cnt_refresh_sdram = 'd0;
+
 
 assign sd_clk = clk_ref;
 
@@ -99,7 +101,7 @@ begin
 			
 			begin 
 			
-				if(cnt_wait != 2000) cnt_wait <= cnt_wait + 1'b1;
+				if(cnt_wait != NOP_WAITE) cnt_wait <= cnt_wait + 1'b1;
 				
 				else
 				begin 
@@ -373,16 +375,16 @@ begin
 		S_ACTIVATE_ROW_WRITE,
 		S_ACTIVATE_ROW_READ: //activate then NOP
 		begin
-			sd_cas_n <= 1;
+			sd_cas_n <= 1'b1;
 			sd_ras_n <= (cnt_wait==0) ? 1'b0 : 1'b1;
-			sd_we_n <= 1;
+			sd_we_n <= 1'b1;
 			sd_addr[12:0] <= (cnt_wait==0)  ? m_addr_set[21:9] : 13'd0;
 		end
 		
 		S_WRITE: //WRITE or NOP
 		begin
 			sd_cas_n <= (m_valid_write == 1 && m_ready_write == 1) ? 1'b0 : 1'b1;
-			sd_ras_n <= 1;
+			sd_ras_n <= 1'b1;
 			sd_we_n <= (m_valid_write == 1 && m_ready_write == 1) ? 1'b0 : 1'b1;
 			sd_addr[12:0] <= {4'd0, m_addr_set[8:0]};
 		end
